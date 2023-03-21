@@ -357,7 +357,7 @@ display: none;
 
 <h1 class="title toc-ignore">data.table and tidyverse</h1>
 <h4 class="author">Jeremy Allen</h4>
-<h4 class="date">2023-03-21 10:47:43 EDT</h4>
+<h4 class="date">2023-03-21 11:16:30 EDT</h4>
 
 </div>
 
@@ -406,7 +406,7 @@ library(tidyverse, quietly = TRUE)</code></pre>
 ## ✖ dplyr::lag()       masks stats::lag()
 ## ✖ dplyr::last()      masks data.table::last()
 ## ✖ purrr::transpose() masks data.table::transpose()</code></pre>
-<pre class="r"><code># reminder, R has a built-in dataset
+<pre class="r"><code># preview
 states</code></pre>
 <pre><code>##              date   state fips  cases deaths
 ##     1: 2020-03-13 Alabama    1      6      0
@@ -725,7 +725,7 @@ df %&gt;%
 ## 10 New Jersey          36079
 ## # … with 46 more rows</code></pre>
 <pre class="r"><code>tictoc::toc()</code></pre>
-<pre><code>## tidyverse way: 0.071 sec elapsed</code></pre>
+<pre><code>## tidyverse way: 0.083 sec elapsed</code></pre>
 <p><strong>Timed: the data.table way</strong></p>
 <pre class="r"><code>tictoc::tic(&quot;data.table way&quot;)
 setkey(dt, state, date)
@@ -789,7 +789,7 @@ dt[, .(deaths_total = data.table::last(deaths)), by = state][order(-deaths_total
 ## 56:           American Samoa           34
 ##                        state deaths_total</code></pre>
 <pre class="r"><code>tictoc::toc()</code></pre>
-<pre><code>## data.table way: 0.018 sec elapsed</code></pre>
+<pre><code>## data.table way: 0.017 sec elapsed</code></pre>
 </div>
 <div id="if-you-read-it-in-as-a-df-and-need-to-convert-to-data.table-is-it-still-faster" class="section level3">
 <h3>If you read it in as a df and need to convert to data.table is it
@@ -857,7 +857,7 @@ dt[, .(deaths_total = data.table::last(deaths)), by = state][order(-deaths_total
 ## 56:           American Samoa           34
 ##                        state deaths_total</code></pre>
 <pre class="r"><code>tictoc::toc()</code></pre>
-<pre><code>## data.table way: 0.024 sec elapsed</code></pre>
+<pre><code>## data.table way: 0.022 sec elapsed</code></pre>
 </div>
 </div>
 <div id="what-if-i-like-pipes-can-data.table-do-that" class="section level2">

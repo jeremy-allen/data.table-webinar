@@ -52,7 +52,7 @@ us <- fread(
 # we haven't loaded tidyverse yet, so let's do now
 library(tidyverse, quietly = TRUE)
 
-# reminder, R has a built-in dataset
+# preview
 states
 
 # for convenience let's have a dt and df for comparing
