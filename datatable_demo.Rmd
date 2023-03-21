@@ -1,0 +1,367 @@
+---
+title: "data.table and tidyverse"
+author: "Jeremy Allen"
+date: "`r format(Sys.time(), tz='America/New_York', usetz = TRUE)`"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+----
+
+<br>
+
+# Why Use data.table?
+
+Nice feature list here: [data.table](https://rdatatable.gitlab.io/data.table/)  
+
+<br>
+<br>
+
+```{r echo=TRUE, include=TRUE}
+
+library(data.table)
+library(tictoc)
+```
+
+Let's use fread() to quickly grab some online COVID data
+
+```{r echo=TRUE, include=TRUE}
+
+# get state data from The New York Times github
+states <- fread(
+  input = "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv",
+  key = c('state', 'date')
+)
+
+# get US national data from The New York Times github
+us <- fread(
+  input = "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us.csv",
+  key = 'date'
+)
+
+# get table of initial closure dates
+#stay_at_home_table <- fread("https://raw.githubusercontent.com/jeremy-allen/covid-deaths/main/home_dates.csv")
+
+```
+
+## Set up a tibble and data.table: df and dt
+
+```{r echo=TRUE, include=TRUE}
+
+# we haven't loaded tidyverse yet, so let's do now
+library(tidyverse, quietly = TRUE)
+
+# reminder, R has a built-in dataset
+states
+
+# for convenience let's have a dt and df for comparing
+dt <- states
+df <- as_tibble(states)
+
+
+```
+
+## First look at data.table syntax
+
+**dt[i,j,by]**  
+
+What is dt[i,j,by]? Interpret this as: take dt, subset/reorder rows using i, then calculate j, grouped by by  
+
+## I
+
+```{r echo=TRUE, include=TRUE}
+
+# i (think filtering by rows)
+dt[state == "Georgia",]
+
+```
+
+#### Your turn! What happens here?
+
+```{r echo=TRUE, include=TRUE}
+
+dt[1:3]
+
+```
+
+#### Compared to here?
+
+```{r echo=TRUE, include=TRUE}
+
+df[1:3]
+
+```
+
+In data.table `dt[1:3]` filters for the first three rows. In base R and tidyverse, `df[1:3]` selects the first three columns.  
+
+## J
+
+```{r echo=TRUE, include=TRUE}
+
+# j (think doing work on columns)
+dt[, max(deaths)]
+
+```
+
+## By
+
+```{r echo=TRUE, include=TRUE}
+
+# by (think grouping your work by categories of a variable)
+dt[, .(max_deaths = max(deaths)), by = state]
+
+```
+
+## tidyverse equivalents of I, J, and By
+
+### I = filter()
+
+```{r echo=TRUE, include=TRUE}
+
+# i = filter
+df %>% 
+  filter(state == "Georgia")
+
+```
+
+### J = doing any work on columns
+
+```{r echo=TRUE, include=TRUE}
+# j = 
+df %>% 
+  pull(deaths) %>% 
+  max()
+
+```
+
+### By = group_by() with summarise()
+
+```{r echo=TRUE, include=TRUE}
+
+# group_by() alone will error
+
+# df %>% 
+#   group_by(state) %>% 
+#   max(deaths) # will error
+
+# group_by() with summarise() is the tidyverse way
+
+df %>% 
+  group_by(state) %>% 
+  summarise(deaths = max(deaths))
+
+```
+
+## Compare data.table and tidyverse methods
+
+Using real-world data  
+
+### tidyverse way  
+
+```{r echo=TRUE, include=TRUE}
+
+#---- TOTAL DEATHS BY STATE ----
+
+# tidyverse way
+
+df %>% 
+  group_by(state) %>% 
+  arrange(state, date) %>% 
+  summarise(deaths_total = last(deaths)) %>% 
+  ungroup() %>% 
+  arrange(desc(deaths_total))
+
+```
+
+### data.table way  
+
+```{r echo=TRUE, include=TRUE}
+
+# data.table way
+
+setkey(dt, state, date) # makes an ordered index of values
+
+dt[, .(deaths_total = data.table::last(deaths)), by = state][order(-deaths_total)]
+
+```
+
+### Let's time them  
+
+**Timed: the tidyverse way** 
+
+```{r echo=TRUE, include=TRUE}
+
+tictoc::tic("tidyverse way")
+df %>% 
+  group_by(state) %>% 
+  arrange(state, date) %>% 
+  summarise(deaths_total = last(deaths)) %>% 
+  ungroup() %>% 
+  arrange(desc(deaths_total))
+tictoc::toc()
+
+```
+
+**Timed: the data.table way** 
+
+```{r echo=TRUE, include=TRUE}
+
+tictoc::tic("data.table way")
+setkey(dt, state, date)
+dt[, .(deaths_total = data.table::last(deaths)), by = state][order(-deaths_total)]
+tictoc::toc()
+
+```
+
+### If you read it in as a df and need to convert to data.table is it still faster?
+
+```{r echo=TRUE, include=TRUE}
+
+tictoc::tic("data.table way")
+dt <- as.data.table(df)
+setkey(dt, state, date)
+dt[, .(deaths_total = data.table::last(deaths)), by = state][order(-deaths_total)]
+tictoc::toc()
+
+```
+
+## What if I like pipes, can data.table do that?
+
+data.table can chain operations
+
+```{r echo=TRUE, include=TRUE}
+
+
+dt[, .(deaths_total = data.table::last(deaths)), by = state][order(-deaths_total)][deaths_total <= 100,]
+
+# or you can put each on new line so long as the closing and opening brackets are together
+
+dt[
+  , .(deaths_total = data.table::last(deaths)), by = state
+  ][
+    order(-deaths_total)
+  ][
+    deaths_total <= 100,
+  ]
+
+# or you can use the pipe with .
+
+dt[, .(deaths_total = data.table::last(deaths)), by = state] %>% 
+  .[order(-deaths_total)] %>% 
+  .[deaths_total <= 100]
+
+
+```
+
+## Adding new columns in place with := writes over the original object
+
+so no assignment necessary (but also, be careful!)  
+
+**data.table way**  
+
+```{r echo=TRUE, include=TRUE}
+
+# dplyr also has a last() function so I need to specify which package I want to use
+
+dt[, state_death_total := data.table::last(deaths), by = state]
+
+names(dt)
+
+```
+
+**tidyverse way**  
+
+does not overwrite objects in place so you need to assign into a new object  
+
+```{r echo=TRUE, include=TRUE}
+
+# tidyverse way
+df <- df %>% 
+  group_by(state) %>% 
+  mutate(state_death_total = last(deaths))
+
+names(df)
+
+```
+
+## Walk through wrangling real data with data.table
+
+### State-level data first
+
+```{r echo=TRUE, include=TRUE}
+
+#---- prep states ----
+
+# Get state names for ones with more than 19 deaths
+# if you want the total per group, but the group entries are
+# cumulative, then you only want the last entry per group
+# .N as an index on .SD, will give you the last row, then by = state
+# then filter for deaths 20 or more
+# and keep only the state names
+state_totals <- states[, .SD[.N], by = state]
+
+over19 <- state_totals[deaths >= 20, state]
+
+# states a user can choose from
+states <- states[state %chin% over19,]
+state_choices <- states[, unique(state)]
+
+# make new columns to show new cases and new deaths
+count_cols = c('cases', 'deaths')
+states[ , paste0('new_', count_cols) := lapply(.SD, function(x) x - data.table::shift(x, n = 1L, type = "lag")),
+        by = state, .SDcols = count_cols]
+
+# preview first 6 rows
+states[, head(.SD)]
+
+```
+
+```{r echo=TRUE, include=TRUE}
+
+date_range <- states[, range(unique(date))]
+names(date_range) <- c("first", "last")
+
+# rolling averages for new cases and new deaths
+# using := as a function is the dt way to create multiple new columns at once,
+# like using multiple mutate() in tidyverse
+states <- states[
+  , `:=`(
+    nc_avg = frollmean(new_cases, 7L, align = "right"),
+    nd_avg = frollmean(new_deaths, 7L, align = "right")
+  )
+  , by = state
+][
+  , c("nc_avg", "nd_avg") := lapply(.SD, ceiling), .SDcols = c("nc_avg", "nd_avg")
+]
+
+# preview first 6 rows
+states[, head(.SD)]
+
+```
+
+### Then US-level data
+
+```{r echo=TRUE, include=TRUE}
+
+#---- prep US ----
+
+# add column for new deaths
+us[ , paste0('new_', count_cols) := lapply(.SD, function(x) x - data.table::shift(x, n = 1L, type = "lag")), .SDcols = count_cols]
+
+# add rolling means
+us[, `:=`(nd_avg = frollmean(new_deaths, 7L, align = "right"),
+          deaths_avg = frollmean(deaths, 7L, align = "right"))]
+# fill NA with 0
+setnafill(us, type = "const", fill = 0L, cols=c("deaths_avg","nd_avg"))
+# round up and convert to integer
+us[, `:=`(nd_avg = as.integer(ceiling(nd_avg)),
+          deaths_avg = as.integer(ceiling(deaths_avg)))]
+
+us[, head(.SD)]
+
+```
+
+# Now use dtplyr if you want to do all of this with tidyverse syntax!
+
+[dtplyr](https://dtplyr.tidyverse.org/)  
